@@ -15,19 +15,28 @@ const reader = new BrowserMultiFormatReader(hints);
 
 /**
  * 写真からGS1コードを読み取る。
- * スマホ写真は「大きな画像の中に小さなコード」になりがちで、画像全体を一度
- * 読むだけでは失敗しやすい。そこで中央を段階的に切り出して拡大し、複数回
- * 読み取りを試す（粉薬ボトルの小さな・曲面のコード対策）。
+ *
+ * 実機の課題は2つ:
+ *  1) 大きな写真の中にコードが小さく写る → 中央を段階的に切り出して拡大する
+ *  2) 医薬品ボトルのバーコードは「縦向き(90°回転)」で印字されていることがある
+ *     → 横向き前提の1次元バーコード読取では読めないため、0/90/270°回転も試す
+ *     （DataMatrix/QRは回転不変なので0°で読めるが、回転は1次元コード対策）
  */
 export async function decodeFromFile(file: File): Promise<string> {
   const img = await loadImage(file);
 
-  // 試す領域（中央比率）。コードは中央に置かれることが多いので段階的に拡大する。
-  const fractions = [1, 0.7, 0.5, 0.35, 0.25];
-  for (const frac of fractions) {
-    const canvas = cropAndScale(img, frac, 1500);
-    const text = tryDecode(canvas);
-    if (text) return text;
+  // コードは中央寄りに置かれることが多いので段階的に切り出して拡大しておく
+  const fractions = [1, 0.6, 0.4];
+  const crops = fractions.map((f) => cropAndScale(img, f, 1500));
+
+  // 回転を外側ループにし、まず全領域を0°→次に90°→270°で試す
+  const rotations = [0, 90, 270];
+  for (const rot of rotations) {
+    for (const base of crops) {
+      const canvas = rot === 0 ? base : rotateCanvas(base, rot);
+      const text = tryDecode(canvas);
+      if (text) return text;
+    }
   }
   throw new Error('decode failed');
 }
@@ -43,7 +52,6 @@ function tryDecode(canvas: HTMLCanvasElement): string | null {
 
 /**
  * 画像の中央を frac 比率で切り出し、最大辺が target px 程度になるよう拡大する。
- * 小さく写ったコードを拡大して判読しやすくする。
  */
 function cropAndScale(img: HTMLImageElement, frac: number, target: number): HTMLCanvasElement {
   const w = img.naturalWidth;
@@ -53,7 +61,6 @@ function cropAndScale(img: HTMLImageElement, frac: number, target: number): HTML
   const sx = Math.round((w - cw) / 2);
   const sy = Math.round((h - ch) / 2);
 
-  // 拡大は最大3倍まで。大きすぎる画像は縮小して扱いやすくする。
   const scale = Math.min(3, target / Math.max(cw, ch));
   const dw = Math.max(1, Math.round(cw * scale));
   const dh = Math.max(1, Math.round(ch * scale));
@@ -65,6 +72,22 @@ function cropAndScale(img: HTMLImageElement, frac: number, target: number): HTML
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(img, sx, sy, cw, ch, 0, 0, dw, dh);
+  return canvas;
+}
+
+/** canvas を deg 度(時計回り)回転した新しい canvas を返す。 */
+function rotateCanvas(src: HTMLCanvasElement, deg: number): HTMLCanvasElement {
+  const swap = deg === 90 || deg === 270;
+  const w = swap ? src.height : src.width;
+  const h = swap ? src.width : src.height;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d')!;
+  ctx.translate(w / 2, h / 2);
+  ctx.rotate((deg * Math.PI) / 180);
+  ctx.drawImage(src, -src.width / 2, -src.height / 2);
   return canvas;
 }
 
