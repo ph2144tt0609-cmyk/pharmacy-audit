@@ -26,7 +26,20 @@ body {
   padding: 12px;
 }
 
+.app-head { display: flex; align-items: center; justify-content: space-between; }
 .app-head h1 { font-size: 20px; margin: 8px 0 16px; }
+.settings-btn { min-height: 36px; padding: 6px 14px; }
+
+select {
+  font: inherit;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  width: 100%;
+  min-height: 44px;
+}
+label select { margin-top: 4px; }
 
 button {
   font: inherit;
@@ -117,6 +130,43 @@ label input { margin-top: 4px; }
 .gs1 dt { color: var(--muted); font-size: 13px; }
 .gs1 dd { margin: 0; font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 14px; word-break: break-all; }
 .error { color: var(--danger); font-size: 14px; margin: 8px 0 0; }
+.info { color: var(--primary); font-size: 14px; margin: 8px 0 0; }
+
+/* ---- settings / masters ---- */
+.settings .list-head { margin-bottom: 16px; }
+.master {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 16px;
+}
+.master h3 { margin: 0 0 4px; font-size: 16px; }
+.master .hint { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+.master-list { list-style: none; padding: 0; margin: 0 0 12px; }
+.master-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.master-list li.empty { color: var(--muted); border-bottom: none; }
+.master-list li > span:first-child { flex: 1; }
+.master-add { display: flex; gap: 8px; }
+.master-add input { flex: 1; }
+.master-add button { white-space: nowrap; }
+
+.drug-list .gtin {
+  font-family: ui-monospace, "SF Mono", Consolas, monospace;
+  font-size: 13px;
+  color: var(--muted);
+  flex: 0 0 auto;
+  word-break: break-all;
+}
+.drug-name-edit { flex: 1; min-width: 0; }
+.drug-add { flex-wrap: wrap; }
+.drug-add input:first-child { flex: 0 0 100%; }
 
 .add { width: 100%; margin-top: 8px; border-style: dashed; color: var(--primary); }
 .actions { display: flex; justify-content: space-between; gap: 10px; margin-top: 16px; position: sticky; bottom: 0; background: var(--bg); padding: 10px 0; }

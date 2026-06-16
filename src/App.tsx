@@ -1,18 +1,24 @@
 import { useEffect, useState } from 'react';
-import { db, type Prescription } from './db';
+import { db, ensureSeedData, type Prescription } from './db';
 import { PrescriptionEditor } from './components/PrescriptionEditor';
 import { PrescriptionList } from './components/PrescriptionList';
 import { PrintView } from './components/PrintView';
+import { Settings } from './components/Settings';
 import './App.css';
 
 type View =
   | { kind: 'list' }
   | { kind: 'edit'; id?: number }
-  | { kind: 'print'; prescription: Prescription };
+  | { kind: 'print'; prescription: Prescription }
+  | { kind: 'settings' };
 
 export default function App() {
   const [view, setView] = useState<View>({ kind: 'list' });
   const [loaded, setLoaded] = useState<Prescription | undefined>();
+
+  useEffect(() => {
+    ensureSeedData();
+  }, []);
 
   useEffect(() => {
     if (view.kind === 'edit' && view.id !== undefined) {
@@ -26,6 +32,11 @@ export default function App() {
     <div className="app">
       <header className="app-head screen-only">
         <h1>調剤監査</h1>
+        {view.kind === 'list' && (
+          <button type="button" className="settings-btn" onClick={() => setView({ kind: 'settings' })}>
+            設定
+          </button>
+        )}
       </header>
 
       <main>
@@ -55,6 +66,10 @@ export default function App() {
             prescription={view.prescription}
             onClose={() => setView({ kind: 'list' })}
           />
+        )}
+
+        {view.kind === 'settings' && (
+          <Settings onClose={() => setView({ kind: 'list' })} />
         )}
       </main>
     </div>

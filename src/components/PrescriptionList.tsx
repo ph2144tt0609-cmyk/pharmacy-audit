@@ -30,7 +30,7 @@ export function PrescriptionList({ onNew, onOpen }: Props) {
               <span className="date">{formatDateTime(p.createdAt)}</span>
             </div>
             <div className="sub">
-              <span>操作者: {p.operator}</span>
+              <span>調剤者: {p.operator}</span>
               <span>散剤 {p.items.length}件</span>
             </div>
           </li>

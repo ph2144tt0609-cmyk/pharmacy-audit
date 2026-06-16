@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { db, type Item, type Prescription } from '../db';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db, lookupDrugName, rememberDrug, type Item, type Prescription } from '../db';
 import { parseGS1 } from '../gs1';
 import { decodeFromFile } from '../decode';
 import { shrinkImage, uuid } from '../utils';
@@ -15,10 +16,15 @@ function emptyItem(): Item {
 }
 
 export function PrescriptionEditor({ initial, onSaved, onCancel }: Props) {
+  const dispensers = useLiveQuery(() => db.dispensers.orderBy('name').toArray());
   const [number, setNumber] = useState(initial?.number ?? '');
   const [operator, setOperator] = useState(initial?.operator ?? localStorage.getItem('operator') ?? '');
   const [items, setItems] = useState<Item[]>(initial?.items ?? [emptyItem()]);
   const [saving, setSaving] = useState(false);
+
+  // 選択中の調剤者がマスタに無い場合でも選択肢に出す
+  const names = dispensers?.map((d) => d.name) ?? [];
+  const options = operator && !names.includes(operator) ? [operator, ...names] : names;
 
   function patchItem(id: string, patch: Partial<Item>) {
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...patch } : it)));
@@ -34,12 +40,18 @@ export function PrescriptionEditor({ initial, onSaved, onCancel }: Props) {
 
   async function save() {
     if (!number.trim() || !operator.trim()) {
-      alert('処方箋番号と操作者名を入力してください');
+      alert('処方箋番号と調剤者を入力してください');
       return;
     }
     setSaving(true);
     try {
       localStorage.setItem('operator', operator);
+      // GTIN ↔ 薬品名 をマスタに学習させる
+      await Promise.all(
+        items
+          .filter((it) => it.gtin && it.drugName)
+          .map((it) => rememberDrug(it.gtin!, it.drugName!)),
+      );
       const record: Prescription = {
         id: initial?.id,
         number: number.trim(),
@@ -66,8 +78,13 @@ export function PrescriptionEditor({ initial, onSaved, onCancel }: Props) {
           <input value={number} onChange={(e) => setNumber(e.target.value)} placeholder="例: 12345" />
         </label>
         <label>
-          操作者名
-          <input value={operator} onChange={(e) => setOperator(e.target.value)} placeholder="例: 山田" />
+          調剤者
+          <select value={operator} onChange={(e) => setOperator(e.target.value)}>
+            <option value="">選択してください</option>
+            {options.map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
         </label>
       </div>
 
@@ -104,21 +121,34 @@ function ItemEditor({
 }) {
   const [decoding, setDecoding] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   const photoUrl = item.weighPhoto ? URL.createObjectURL(item.weighPhoto) : null;
 
   async function onGS1File(file: File) {
     setDecoding(true);
     setError(null);
+    setInfo(null);
     try {
       const text = await decodeFromFile(file);
       const parsed = parseGS1(text);
-      onChange({
+      const patch: Partial<Item> = {
         gs1Raw: parsed.raw,
         gtin: parsed.gtin,
         lot: parsed.lot,
         expiry: parsed.expiry,
         serial: parsed.serial,
-      });
+      };
+      // GTIN がマスタにあれば薬品名を自動入力（未入力のときのみ）
+      if (parsed.gtin) {
+        const known = await lookupDrugName(parsed.gtin);
+        if (known && !item.drugName) {
+          patch.drugName = known;
+          setInfo(`薬品マスタから「${known}」を自動入力しました`);
+        } else if (!known) {
+          setInfo('このGTINは薬品マスタ未登録です。薬品名を入力して保存すると次回から自動入力されます');
+        }
+      }
+      onChange(patch);
     } catch {
       setError('コードを読み取れませんでした。もう一度撮影してください');
     } finally {
@@ -157,6 +187,7 @@ function ItemEditor({
           <span>{decoding ? '解析中…' : 'コードを撮影して読み取り'}</span>
         </label>
         {error && <p className="error">{error}</p>}
+        {info && <p className="info">{info}</p>}
         {item.gtin && (
           <dl className="gs1">
             {item.gtin && (<><dt>GTIN</dt><dd>{item.gtin}</dd></>)}

@@ -42,7 +42,7 @@ export function PrintView({ prescription, onClose }: Props) {
           <div className="head-meta">
             <div><span className="lbl">処方箋番号</span><span className="val">{prescription.number}</span></div>
             <div><span className="lbl">日時</span><span className="val">{formatDateTime(prescription.createdAt)}</span></div>
-            <div><span className="lbl">操作者</span><span className="val">{prescription.operator}</span></div>
+            <div><span className="lbl">調剤者</span><span className="val">{prescription.operator}</span></div>
           </div>
         </header>
 
