@@ -4,6 +4,9 @@ import { db, lookupDrugName, rememberDrug, type Item, type Prescription } from '
 import { parseGS1 } from '../gs1';
 import { decodeFromFile } from '../decode';
 import { shrinkImage, uuid } from '../utils';
+import { expiryStatus } from '../expiry';
+import { CameraScanner } from './CameraScanner';
+import './editor-extra.css';
 
 interface Props {
   initial?: Prescription;
@@ -120,9 +123,33 @@ function ItemEditor({
   canRemove: boolean;
 }) {
   const [decoding, setDecoding] = useState(false);
+  const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const photoUrl = item.weighPhoto ? URL.createObjectURL(item.weighPhoto) : null;
+
+  // 読み取ったコード文字列を解析してフィールドへ反映する（写真・カメラ共通）
+  async function applyScanText(text: string) {
+    const parsed = parseGS1(text);
+    const patch: Partial<Item> = {
+      gs1Raw: parsed.raw,
+      gtin: parsed.gtin,
+      lot: parsed.lot,
+      expiry: parsed.expiry,
+      serial: parsed.serial,
+    };
+    // GTIN がマスタにあれば薬品名を自動入力（未入力のときのみ）
+    if (parsed.gtin) {
+      const known = await lookupDrugName(parsed.gtin);
+      if (known && !item.drugName) {
+        patch.drugName = known;
+        setInfo(`薬品マスタから「${known}」を自動入力しました`);
+      } else if (!known) {
+        setInfo('このGTINは薬品マスタ未登録です。薬品名を入力して保存すると次回から自動入力されます');
+      }
+    }
+    onChange(patch);
+  }
 
   async function onGS1File(file: File) {
     setDecoding(true);
@@ -130,30 +157,19 @@ function ItemEditor({
     setInfo(null);
     try {
       const text = await decodeFromFile(file);
-      const parsed = parseGS1(text);
-      const patch: Partial<Item> = {
-        gs1Raw: parsed.raw,
-        gtin: parsed.gtin,
-        lot: parsed.lot,
-        expiry: parsed.expiry,
-        serial: parsed.serial,
-      };
-      // GTIN がマスタにあれば薬品名を自動入力（未入力のときのみ）
-      if (parsed.gtin) {
-        const known = await lookupDrugName(parsed.gtin);
-        if (known && !item.drugName) {
-          patch.drugName = known;
-          setInfo(`薬品マスタから「${known}」を自動入力しました`);
-        } else if (!known) {
-          setInfo('このGTINは薬品マスタ未登録です。薬品名を入力して保存すると次回から自動入力されます');
-        }
-      }
-      onChange(patch);
+      await applyScanText(text);
     } catch {
       setError('コードを読み取れませんでした。もう一度撮影してください');
     } finally {
       setDecoding(false);
     }
+  }
+
+  function onCameraResult(text: string) {
+    setScanning(false);
+    setError(null);
+    setInfo(null);
+    void applyScanText(text);
   }
 
   async function onWeighFile(file: File) {
@@ -176,7 +192,18 @@ function ItemEditor({
       </label>
 
       <fieldset>
-        <legend>GS1コード</legend>
+        <legend>GS1コード（手動入力・訂正可）</legend>
+        <button
+          type="button"
+          className="scan-btn"
+          onClick={() => {
+            setError(null);
+            setInfo(null);
+            setScanning(true);
+          }}
+        >
+          カメラでスキャン
+        </button>
         <label className="file-btn">
           <input
             type="file"
@@ -184,18 +211,56 @@ function ItemEditor({
             capture="environment"
             onChange={(e) => e.target.files?.[0] && onGS1File(e.target.files[0])}
           />
-          <span>{decoding ? '解析中…' : 'コードを撮影して読み取り'}</span>
+          <span>{decoding ? '解析中…' : '写真から読み取り'}</span>
         </label>
         {error && <p className="error">{error}</p>}
         {info && <p className="info">{info}</p>}
-        {item.gtin && (
-          <dl className="gs1">
-            {item.gtin && (<><dt>GTIN</dt><dd>{item.gtin}</dd></>)}
-            {item.lot && (<><dt>ロット</dt><dd>{item.lot}</dd></>)}
-            {item.expiry && (<><dt>有効期限</dt><dd>{item.expiry}</dd></>)}
-            {item.serial && (<><dt>シリアル</dt><dd>{item.serial}</dd></>)}
-          </dl>
+        {scanning && (
+          <CameraScanner onResult={onCameraResult} onClose={() => setScanning(false)} />
         )}
+        <div className="gs1-fields">
+          <label>
+            GTIN
+            <input
+              inputMode="numeric"
+              value={item.gtin ?? ''}
+              onChange={(e) => onChange({ gtin: e.target.value })}
+              placeholder="14桁の商品コード"
+            />
+          </label>
+          <label>
+            ロット
+            <input
+              value={item.lot ?? ''}
+              onChange={(e) => onChange({ lot: e.target.value })}
+              placeholder="ロット番号"
+            />
+          </label>
+          <label>
+            <span className="exp-label">
+              有効期限
+              {(() => {
+                const st = expiryStatus(item.expiry);
+                if (st === 'expired') return <span className="exp-badge expired">期限切れ</span>;
+                if (st === 'soon') return <span className="exp-badge soon">期限間近</span>;
+                return null;
+              })()}
+            </span>
+            <input
+              value={item.expiry ?? ''}
+              onChange={(e) => onChange({ expiry: e.target.value })}
+              placeholder="例: 2027-03-末"
+            />
+          </label>
+          <label>
+            シリアル
+            <input
+              value={item.serial ?? ''}
+              onChange={(e) => onChange({ serial: e.target.value })}
+              placeholder="シリアル番号"
+            />
+          </label>
+        </div>
       </fieldset>
 
       <fieldset>

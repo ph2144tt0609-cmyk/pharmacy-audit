@@ -1,6 +1,8 @@
 import { useEffect, useMemo } from 'react';
 import type { Prescription } from '../db';
 import { formatDateTime } from '../utils';
+import { expiryStatus } from '../expiry';
+import './printview-extra.css';
 
 interface Props {
   prescription: Prescription;
@@ -64,7 +66,12 @@ export function PrintView({ prescription, onClose }: Props) {
                   <dl className="gs1-print">
                     {it.gtin && (<><dt>GTIN</dt><dd>{it.gtin}</dd></>)}
                     {it.lot && (<><dt>ロット</dt><dd>{it.lot}</dd></>)}
-                    {it.expiry && (<><dt>期限</dt><dd>{it.expiry}</dd></>)}
+                    {it.expiry && (() => {
+                      const st = expiryStatus(it.expiry);
+                      const cls = st === 'expired' ? 'exp-expired' : st === 'soon' ? 'exp-soon' : undefined;
+                      const note = st === 'expired' ? '（期限切れ）' : st === 'soon' ? '（期限間近）' : '';
+                      return (<><dt>期限</dt><dd className={cls}>{it.expiry}{note}</dd></>);
+                    })()}
                     {it.serial && (<><dt>S/N</dt><dd>{it.serial}</dd></>)}
                   </dl>
                 </td>

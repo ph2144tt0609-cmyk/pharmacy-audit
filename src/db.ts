@@ -58,6 +58,29 @@ export const db = new PharmacyDB();
 // 初期データ投入：調剤者マスタが空なら既定の3名を登録する
 const DEFAULT_DISPENSERS = ['田中亨', '藤田耕成', '長谷宏子'];
 
+// 緑ヶ丘薬局でよく使う散剤の既定マスタ（GTIN ↔ 薬品名）。
+// ネット調査で確定したGTINを順次ここへ追加する。core照合するので、
+// 入手しやすい JAN(13桁) でも 調剤包装単位の GTIN(14桁) でも紐づく。
+const DEFAULT_DRUGS: Drug[] = [
+  // 例: { gtin: '4987XXXXXXXXXX', name: 'カロナール細粒20%' },
+];
+
+/**
+ * GTIN を「包装段階に依存しない中核キー」に正規化する。
+ *
+ * 日本の医薬品は同一商品でも調剤包装単位 / 販売包装単位 / 元梱包装単位で
+ * GTIN が変わる（先頭の包装識別子と末尾のチェックデジットが変わる）。
+ * GTIN-14 の 2〜13桁目（= GTIN-13 の 1〜12桁目）は商品識別の中核で全段階共通なので、
+ * ここを取り出して照合すると、登録した番号と読み取った番号の段階が違っても一致できる。
+ */
+export function gtinKey(raw: string | undefined): string {
+  const d = (raw ?? '').replace(/\D/g, '');
+  if (d.length === 14) return d.slice(1, 13); // 包装識別子とチェックデジットを除いた12桁
+  if (d.length === 13) return d.slice(0, 12); // チェックデジットを除いた12桁
+  if (d.length === 12) return d.slice(0, 11).padStart(12, '0');
+  return d; // 想定外の長さはそのまま比較
+}
+
 export async function ensureSeedData(): Promise<void> {
   // トランザクションで「件数確認→投入」を直列化し、二重投入を防ぐ
   await db.transaction('rw', db.dispensers, async () => {
@@ -66,12 +89,34 @@ export async function ensureSeedData(): Promise<void> {
       await db.dispensers.bulkAdd(DEFAULT_DISPENSERS.map((name) => ({ name })));
     }
   });
+
+  // 薬品マスタ：既定リストのうち、まだ中核キーが存在しないものだけ追加する
+  // （ユーザーが手で直した名前を上書きしないよう、core で重複判定する）
+  if (DEFAULT_DRUGS.length === 0) return;
+  await db.transaction('rw', db.drugs, async () => {
+    const existing = await db.drugs.toArray();
+    const have = new Set(existing.map((d) => gtinKey(d.gtin)));
+    const toAdd = DEFAULT_DRUGS.filter((d) => {
+      const k = gtinKey(d.gtin);
+      if (have.has(k)) return false;
+      have.add(k);
+      return true;
+    });
+    if (toAdd.length > 0) await db.drugs.bulkPut(toAdd);
+  });
 }
 
-// GTIN から薬品名を引く（マスタに無ければ undefined）
+// GTIN から薬品名を引く（マスタに無ければ undefined）。
+// まず完全一致、無ければ中核キー（包装段階を無視した12桁）で照合する。
 export async function lookupDrugName(gtin: string): Promise<string | undefined> {
-  const drug = await db.drugs.get(gtin);
-  return drug?.name;
+  const exact = await db.drugs.get(gtin);
+  if (exact) return exact.name;
+
+  const key = gtinKey(gtin);
+  if (!key) return undefined;
+  const all = await db.drugs.toArray();
+  const hit = all.find((d) => gtinKey(d.gtin) === key);
+  return hit?.name;
 }
 
 // 「GTIN + 薬品名」をマスタに学習させる（既存があれば上書き更新）

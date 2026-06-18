@@ -1,0 +1,89 @@
+.backup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.backup-actions button {
+  flex: 1 1 auto;
+  min-width: 150px;
+}
+
+.backup-actions .backup-file-label {
+  flex: 1 1 auto;
+  min-width: 150px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  border: 1px solid #888;
+  border-radius: 8px;
+  background: #f5f5f5;
+  cursor: pointer;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.backup-actions .backup-file-label:active {
+  background: #e8e8e8;
+}
+
+.backup-actions .backup-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.backup-busy {
+  margin-top: 8px;
+  color: #555;
+  font-size: 0.9em;
+}
+
+.drug-bulk {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.drug-bulk-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.drug-bulk-actions button {
+  flex: 1 1 auto;
+  min-width: 150px;
+}
+
+.drug-bulk-file-label {
+  flex: 1 1 auto;
+  min-width: 150px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  border: 1px solid #888;
+  border-radius: 8px;
+  background: #f5f5f5;
+  cursor: pointer;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.drug-bulk-file-label:active {
+  background: #e8e8e8;
+}
+
+.drug-bulk-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}

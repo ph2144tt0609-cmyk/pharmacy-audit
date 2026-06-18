@@ -1,6 +1,9 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db';
+import { exportBackup, importBackup } from '../backup';
+import { importDrugsCsv, importDrugsJson, exportDrugsCsv } from '../drugImport';
+import './settings-extra.css';
 
 interface Props {
   onClose: () => void;
@@ -16,7 +19,69 @@ export function Settings({ onClose }: Props) {
 
       <DispenserMaster />
       <DrugMaster />
+      <BackupSection />
     </div>
+  );
+}
+
+function BackupSection() {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function doExport() {
+    setBusy(true);
+    try {
+      await exportBackup();
+    } catch {
+      alert('書き出しに失敗しました');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    // 同じファイルを連続で選べるよう値をリセット
+    e.target.value = '';
+    if (!file) return;
+    setBusy(true);
+    try {
+      const r = await importBackup(file);
+      alert(`復元しました: 処方箋 ${r.prescriptions}件 / 調剤者 ${r.dispensers}件 / 薬品 ${r.drugs}件`);
+    } catch {
+      alert('読み込みに失敗しました');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="master">
+      <h3>データのバックアップ</h3>
+      <p className="hint">
+        端末内のファイルに保存／復元します。クラウドには送信しません。
+        ブラウザのデータ消去や端末の故障に備えて、ときどき書き出して保管してください。
+      </p>
+
+      <div className="backup-actions">
+        <button type="button" className="primary" onClick={doExport} disabled={busy}>
+          バックアップを書き出し
+        </button>
+        <label className="backup-file-label">
+          バックアップを読み込み
+          <input
+            ref={fileRef}
+            className="backup-file-input"
+            type="file"
+            accept="application/json,.json"
+            onChange={onFile}
+            disabled={busy}
+          />
+        </label>
+      </div>
+
+      {busy && <p className="backup-busy">処理中です…</p>}
+    </section>
   );
 }
 
@@ -122,6 +187,70 @@ function DrugMaster() {
         />
         <button type="button" className="primary" onClick={add}>追加</button>
       </div>
+
+      <DrugBulkImport />
     </section>
+  );
+}
+
+function DrugBulkImport() {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    // 同じファイルを連続で選べるよう値をリセット
+    e.target.value = '';
+    if (!file) return;
+    setBusy(true);
+    try {
+      const text = await file.text();
+      const isJson =
+        file.name.toLowerCase().endsWith('.json') ||
+        /^\s*[[{]/.test(text);
+      const r = isJson ? await importDrugsJson(text) : await importDrugsCsv(text);
+      alert(`取込: 追加 ${r.added}件 / スキップ ${r.skipped}件`);
+    } catch {
+      alert('取込に失敗しました');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function doExport() {
+    setBusy(true);
+    try {
+      await exportDrugsCsv();
+    } catch {
+      alert('書き出しに失敗しました');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="drug-bulk">
+      <p className="hint">
+        手元の一覧をまとめて取り込めます。CSVは1行1件「GTIN,薬品名」（先頭のヘッダ行は自動で無視）。
+        JSONも読み込めます。端末内のファイルのみを扱い、クラウドには送信しません。
+      </p>
+      <div className="drug-bulk-actions">
+        <label className="drug-bulk-file-label">
+          ファイルから取込（CSV / JSON）
+          <input
+            ref={fileRef}
+            className="drug-bulk-file-input"
+            type="file"
+            accept=".csv,.json,text/csv,application/json"
+            onChange={onFile}
+            disabled={busy}
+          />
+        </label>
+        <button type="button" onClick={doExport} disabled={busy}>
+          CSVで書き出し
+        </button>
+      </div>
+      {busy && <p className="backup-busy">処理中です…</p>}
+    </div>
   );
 }

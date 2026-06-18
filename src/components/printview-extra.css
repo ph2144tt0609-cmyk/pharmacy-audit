@@ -1,0 +1,12 @@
+/* 有効期限の警告色（PrintView の期限セルで使用） */
+/* 印刷でも色が出るよう色指定のみ（@media print 不要） */
+
+.exp-expired {
+  color: #c0392b;
+  font-weight: 700;
+}
+
+.exp-soon {
+  color: #b45309;
+  font-weight: 600;
+}
