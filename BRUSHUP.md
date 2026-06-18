@@ -17,11 +17,10 @@
 5. この台帳の done を更新
 
 ## バックログ（優先度順）
-- [ ] PWA化（manifest + service worker、オフライン動作・ホーム画面追加最適化）
-- [ ] 印刷レイアウト改善（薬局名ヘッダー・GS1コード写真の任意添付）
+- [ ] PWA化（manifest + service worker、オフライン動作・ホーム画面追加最適化。※PNGアイコンが要・現状はSVGのみ）
 - [ ] 入力下書きの自動保存（誤操作・離脱対策）
-- [ ] g数の妥当性チェック・単位補助
-- [ ] 有効期限のしきい値（SOON_DAYS=180）を設定画面から変更可能に（任意）
+- [ ] 印刷: GS1コード写真の任意添付（薬局名ヘッダー・監査者確認欄は実装済み）
+- [ ] カメラ読取がまだ不十分な場合の代替（@zxing decodeFromConstraints へ置換／タップフォーカス等）
 
 ## done（実施履歴）
 - 2026-06-18 第1イテレーション（デプロイ済み）:
@@ -36,3 +35,11 @@
 - 2026-06-18 自動ループは利用者の指示で一旦停止。以降は手動対応:
   - ライブカメラスキャン追加（シャッター不要・連続読取→自動反映、回転対応で縦バーコード可、写真読取はフォールバックで継続）。`CameraScanner.tsx` + `scanner.css` + `decode.ts`(decodeFromVideoFrame) + `PrescriptionEditor.tsx`
   - これ以前の自動ブラッシュアップ分はデプロイ済みだがmain未コミットだったため、本コミットでmainを公開サイトに同期。
+  - カメラ読取の改善（「読み取れない」対応）: 高解像度要求(1920×1080)・連続オートフォーカス・ライト(トーチ)トグル・実解像度の画面表示を追加。`onResult`をref化し`useEffect([])`で親再レンダー時のカメラ再起動を防止。ライブ解読は中央寄り(0.5)＋target1400に調整。`CameraScanner.tsx` + `scanner.css` + `decode.ts`。※実機カメラ検証は要ユーザー（プレビューはカメラ無しでgraceful エラーを確認）。
+  - 公式GTINマスター取込（medhot.medd.jp の医薬品コード表）。GTIN→販売名 約12.9万件を `public/gtin-master.txt`（タブ区切り・7.6MB）に同梱し、起動時にメモリ(Map)へ読込→スキャン即・薬品名自動表示。`gtinMaster.ts` + `App.tsx`(起動時load) + `PrescriptionEditor.tsx`(マスター併用lookup) + `Settings.tsx`(状態表示/再読込)。dev検証で128,994件・20260531版の読込を確認。**月1更新手順**: medhot から `A_YYYYMMDD_1.txt`/`_2.txt`(SJIS) を取得→file1[販売名=4列,調剤=30列]/file2[調剤=30,販売=33,元梱=34列]を `gtin<TAB>名` に整形→`public/gtin-master.txt` を差替え(#version更新)→`npm run deploy`。
+- 2026-06-18 第3イテレーション（デプロイ手動モード・承認後にデプロイ＆main同期）:
+  - 印刷ヘッダー／監査者確認欄追加（最上部「緑ヶ丘薬局（株式会社しずく）」・最下部に署名欄＋確認印枠）。`PrintView.tsx` + `printview-extra.css`。※件数が非常に多い処方ではA4 1枚に収まるか要確認。
+  - 有効期限「間近」しきい値を設定画面から変更可能に（1〜3650日・既定180・localStorage `pa.soonDays`）。`expiry.ts`(getSoonDays/setSoonDays、expiryStatusのシグネチャは不変) + `Settings.tsx`。
+  - g数の妥当性チェック＋単位「g」表示（非数値/0以下は警告のみ・保存はブロックしない）。`PrescriptionEditor.tsx` + `editor-extra.css`。
+  - 上記を含む作業ツリー全体を本デプロイで公開し、mainにもコミットして公開サイトと同期。
+- 運用メモ: 自動ループは「デプロイ手動」モードで稼働中（cron `7 * * * *`, session-only）。各イテレーションは実装＋ビルド検証まで自動、`npm run deploy`はユーザー承認後のみ。

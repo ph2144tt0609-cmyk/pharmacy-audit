@@ -73,11 +73,26 @@
   line-height: 1.5;
 }
 
+.scanner-res {
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+
+.scanner-actions {
+  display: flex;
+  gap: 10px;
+}
+
 .scanner-bar button {
+  flex: 1;
   min-height: 48px;
   background: #fff;
   color: #111;
   border: none;
   border-radius: 8px;
   font-weight: 600;
+}
+
+.scanner-actions button.on {
+  background: #ffd54a;
 }

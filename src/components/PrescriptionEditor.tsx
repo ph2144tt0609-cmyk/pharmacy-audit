@@ -5,6 +5,7 @@ import { parseGS1 } from '../gs1';
 import { decodeFromFile } from '../decode';
 import { shrinkImage, uuid } from '../utils';
 import { expiryStatus } from '../expiry';
+import { lookupGtinMaster } from '../gtinMaster';
 import { CameraScanner } from './CameraScanner';
 import './editor-extra.css';
 
@@ -16,6 +17,15 @@ interface Props {
 
 function emptyItem(): Item {
   return { id: uuid() };
+}
+
+// 秤量g数が「正の数値」として解釈できるかの軽い妥当性チェック。
+// 空文字は対象外（任意入力のため）。0・負数・非数値は不正とみなす。
+function isValidGrams(s: string): boolean {
+  const t = s.trim();
+  if (t === '') return true;
+  const n = Number(t);
+  return Number.isFinite(n) && n > 0;
 }
 
 export function PrescriptionEditor({ initial, onSaved, onCancel }: Props) {
@@ -138,14 +148,20 @@ function ItemEditor({
       expiry: parsed.expiry,
       serial: parsed.serial,
     };
-    // GTIN がマスタにあれば薬品名を自動入力（未入力のときのみ）
+    // GTIN から薬品名を自動入力（未入力のときのみ）。
+    // まず自分の薬品マスタ、無ければ公式GTINマスター（約13万件）を参照。
     if (parsed.gtin) {
-      const known = await lookupDrugName(parsed.gtin);
+      const userHit = await lookupDrugName(parsed.gtin);
+      const known = userHit ?? lookupGtinMaster(parsed.gtin);
       if (known && !item.drugName) {
         patch.drugName = known;
-        setInfo(`薬品マスタから「${known}」を自動入力しました`);
+        setInfo(
+          userHit
+            ? `薬品マスタから「${known}」を自動入力しました`
+            : `公式GTINマスターから「${known}」を自動入力しました`,
+        );
       } else if (!known) {
-        setInfo('このGTINは薬品マスタ未登録です。薬品名を入力して保存すると次回から自動入力されます');
+        setInfo('このGTINは薬品マスタ・公式マスターに該当なし。薬品名を入力して保存すると次回から自動入力されます');
       }
     }
     onChange(patch);
@@ -267,12 +283,18 @@ function ItemEditor({
         <legend>秤量</legend>
         <label>
           g数(任意)
-          <input
-            inputMode="decimal"
-            value={item.grams ?? ''}
-            onChange={(e) => onChange({ grams: e.target.value })}
-            placeholder="例: 1.50"
-          />
+          <span className="grams-row">
+            <input
+              inputMode="decimal"
+              value={item.grams ?? ''}
+              onChange={(e) => onChange({ grams: e.target.value })}
+              placeholder="例: 1.50"
+            />
+            <span className="grams-unit">g</span>
+          </span>
+          {!isValidGrams(item.grams ?? '') && (
+            <span className="grams-warn">数値で入力してください（例: 1.50）</span>
+          )}
         </label>
         <label className="file-btn">
           <input

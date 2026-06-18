@@ -2,7 +2,59 @@
 // 対応形式: YYYY-MM-DD / YYYY-MM-末 / YYYY-MM
 // 日が「末」/「00」/欠落のときは、その月の月末日として扱う。
 
-export const SOON_DAYS = 180;
+/** 「期限間近」とみなす既定の日数（今日からX日以内）。 */
+export const DEFAULT_SOON_DAYS = 180;
+
+/** 後方互換のため残置。判定には getSoonDays() の現在値を使う。 */
+export const SOON_DAYS = DEFAULT_SOON_DAYS;
+
+const SOON_DAYS_KEY = 'pa.soonDays';
+
+/** 1〜3650 にクランプして整数化する。 */
+function clampSoonDays(n: number): number {
+  if (!Number.isFinite(n)) return DEFAULT_SOON_DAYS;
+  const i = Math.round(n);
+  if (i < 1) return 1;
+  if (i > 3650) return 3650;
+  return i;
+}
+
+/** localStorage から初期値を読む。無効・未保存なら既定値。 */
+function loadSoonDays(): number {
+  try {
+    const raw = localStorage.getItem(SOON_DAYS_KEY);
+    if (raw == null) return DEFAULT_SOON_DAYS;
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return DEFAULT_SOON_DAYS;
+    return clampSoonDays(n);
+  } catch {
+    return DEFAULT_SOON_DAYS;
+  }
+}
+
+// 現在の閾値（モジュール内部で保持）。
+let soonDays = loadSoonDays();
+
+/** 現在の「期限間近」とみなす日数を返す。 */
+export function getSoonDays(): number {
+  return soonDays;
+}
+
+/**
+ * 「期限間近」とみなす日数を設定する。
+ * 1〜3650 にクランプし、localStorage へ保存してモジュール変数を更新する。
+ * クランプ後の実際の値を返す。
+ */
+export function setSoonDays(n: number): number {
+  const v = clampSoonDays(n);
+  soonDays = v;
+  try {
+    localStorage.setItem(SOON_DAYS_KEY, String(v));
+  } catch {
+    // 保存できなくても現在値の更新は維持する
+  }
+  return v;
+}
 
 export type ExpiryStatus = 'expired' | 'soon' | 'ok' | 'unknown';
 
@@ -52,7 +104,7 @@ function startOfDay(d: Date): Date {
 
 /**
  * 期限切れ/間近を判定する。
- * 月末日 < 今日 → expired、SOON_DAYS日以内 → soon、それ以外 ok、
+ * 月末日 < 今日 → expired、現在の soonDays 日以内 → soon、それ以外 ok、
  * 解釈不能/空 → unknown。
  */
 export function expiryStatus(
@@ -69,7 +121,7 @@ export function expiryStatus(
 
   const msPerDay = 24 * 60 * 60 * 1000;
   const diffDays = Math.round((expDay.getTime() - today.getTime()) / msPerDay);
-  if (diffDays <= SOON_DAYS) return 'soon';
+  if (diffDays <= soonDays) return 'soon';
 
   return 'ok';
 }

@@ -10,3 +10,54 @@
   color: #b45309;
   font-weight: 600;
 }
+
+/* 薬局名ヘッダー（シート最上部・記録タイトルの上） */
+.sheet-pharmacy {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4mm;
+}
+.sheet-pharmacy .pharmacy-name {
+  font-size: 16pt;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+.sheet-pharmacy .pharmacy-corp {
+  font-size: 10pt;
+  color: #555;
+}
+
+/* 監査者確認欄（シート下部・手書き/押印用） */
+.sheet-confirm {
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-end;
+  gap: 12mm;
+  margin-top: 8mm;
+  font-size: 11pt;
+}
+.sheet-confirm .confirm-label {
+  color: #555;
+  margin-right: 4mm;
+  white-space: nowrap;
+}
+.sheet-confirm .confirm-signature {
+  display: flex;
+  align-items: flex-end;
+}
+.sheet-confirm .confirm-line {
+  display: inline-block;
+  width: 55mm;
+  border-bottom: 1px solid #000;
+}
+.sheet-confirm .confirm-stamp {
+  display: flex;
+  align-items: center;
+}
+.sheet-confirm .confirm-box {
+  display: inline-block;
+  width: 18mm;
+  height: 18mm;
+  border: 1px solid #000;
+}

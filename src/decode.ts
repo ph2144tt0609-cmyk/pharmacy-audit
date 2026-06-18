@@ -38,7 +38,8 @@ export function decodeFromVideoFrame(video: HTMLVideoElement): string | null {
   const w = video.videoWidth;
   const h = video.videoHeight;
   if (!w || !h) return null;
-  return decodeFromSource(video, w, h, [1, 0.6], [0, 90], 1200);
+  // 高解像度フレームを活かすため target を上げ、中央寄り(0.5)も試す
+  return decodeFromSource(video, w, h, [1, 0.5], [0, 90], 1400);
 }
 
 /** 領域(中央比率)×回転 を順に試し、最初に読めたテキストを返す。 */

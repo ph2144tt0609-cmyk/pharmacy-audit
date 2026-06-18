@@ -1,8 +1,10 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db';
 import { exportBackup, importBackup } from '../backup';
 import { importDrugsCsv, importDrugsJson, exportDrugsCsv } from '../drugImport';
+import { gtinMasterStatus, loadGtinMaster, type GtinMasterStatus } from '../gtinMaster';
+import { getSoonDays, setSoonDays } from '../expiry';
 import './settings-extra.css';
 
 interface Props {
@@ -18,9 +20,97 @@ export function Settings({ onClose }: Props) {
       </div>
 
       <DispenserMaster />
+      <ExpiryThresholdSection />
+      <GtinMasterSection />
       <DrugMaster />
       <BackupSection />
     </div>
+  );
+}
+
+function ExpiryThresholdSection() {
+  const [days, setDays] = useState<number>(() => getSoonDays());
+  const [saved, setSaved] = useState(false);
+
+  function onChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const raw = e.target.value;
+    // 空欄や数字以外は確定保存しない（入力途中を許容）
+    if (raw.trim() === '') {
+      setSaved(false);
+      return;
+    }
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return;
+    const applied = setSoonDays(n);
+    setDays(applied);
+    setSaved(true);
+  }
+
+  return (
+    <section className="master">
+      <h3>期限間近とみなす日数</h3>
+      <p className="hint">
+        有効期限まで{days}日以内のものを「期限間近」として警告します（1〜3650日）。
+        変更すると即時に保存され、この端末に記憶されます。
+      </p>
+
+      <div className="master-add">
+        <input
+          type="number"
+          inputMode="numeric"
+          min={1}
+          max={3650}
+          value={days}
+          onChange={onChange}
+        />
+        <span className="hint">日以内</span>
+      </div>
+
+      {saved && <p className="master-status">保存しました（{days}日）</p>}
+    </section>
+  );
+}
+
+function GtinMasterSection() {
+  const [status, setStatus] = useState<GtinMasterStatus>(gtinMasterStatus());
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    loadGtinMaster()
+      .then(setStatus)
+      .catch(() => {});
+  }, []);
+
+  async function reload() {
+    setBusy(true);
+    try {
+      setStatus(await loadGtinMaster(true));
+    } catch {
+      alert('公式マスターの読み込みに失敗しました');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="master">
+      <h3>公式GTINマスター</h3>
+      <p className="hint">
+        医薬品の公式コード表（GTIN↔販売名）。スキャンしたGS1コードから薬品名を自動表示します。
+        端末内に保持し、クラウドへは送信しません。
+      </p>
+      <p className="master-status">
+        状態:{' '}
+        {status.loaded
+          ? `読込済み ${status.count.toLocaleString()}件${status.version ? `（${status.version}版）` : ''}`
+          : busy
+            ? '読込中…'
+            : '未読込'}
+      </p>
+      <button type="button" onClick={reload} disabled={busy}>
+        {busy ? '読込中…' : '再読込'}
+      </button>
+    </section>
   );
 }
 

@@ -55,3 +55,28 @@
 .exp-badge.soon {
   background: #b45309;
 }
+
+/* 秤量g数の入力欄と単位サフィックス（ItemEditor で使用） */
+.grams-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.grams-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.grams-unit {
+  flex: none;
+  font-size: 0.95rem;
+  color: #555;
+}
+
+/* g数が正の数値でないときの注意喚起（保存はブロックしない） */
+.grams-warn {
+  margin-top: 0.2rem;
+  font-size: 0.75rem;
+  color: #c0392b;
+}

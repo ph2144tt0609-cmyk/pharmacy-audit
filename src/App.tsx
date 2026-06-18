@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { db, ensureSeedData, type Prescription } from './db';
+import { loadGtinMaster } from './gtinMaster';
 import { PrescriptionEditor } from './components/PrescriptionEditor';
 import { PrescriptionList } from './components/PrescriptionList';
 import { PrintView } from './components/PrintView';
@@ -18,6 +19,8 @@ export default function App() {
 
   useEffect(() => {
     ensureSeedData();
+    // 公式GTINマスターをメモリへ読み込む（失敗してもアプリは動作する）
+    loadGtinMaster().catch(() => {});
   }, []);
 
   useEffect(() => {

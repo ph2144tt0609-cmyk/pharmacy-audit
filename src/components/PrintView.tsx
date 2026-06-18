@@ -39,6 +39,11 @@ export function PrintView({ prescription, onClose }: Props) {
       </div>
 
       <div className="sheet">
+        <div className="sheet-pharmacy">
+          <span className="pharmacy-name">緑ヶ丘薬局</span>
+          <span className="pharmacy-corp">株式会社しずく</span>
+        </div>
+
         <header className="sheet-head">
           <h1>調剤監査記録</h1>
           <div className="head-meta">
@@ -83,6 +88,17 @@ export function PrintView({ prescription, onClose }: Props) {
             ))}
           </tbody>
         </table>
+
+        <footer className="sheet-confirm">
+          <div className="confirm-signature">
+            <span className="confirm-label">監査者</span>
+            <span className="confirm-line" />
+          </div>
+          <div className="confirm-stamp">
+            <span className="confirm-label">確認印</span>
+            <span className="confirm-box" />
+          </div>
+        </footer>
       </div>
     </div>
   );
