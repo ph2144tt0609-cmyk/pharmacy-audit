@@ -63,3 +63,18 @@
   border: 1px solid #c7c7cc;
   border-radius: 8px;
 }
+
+/* 未完了アイテムがある処方箋の行に出すバッジ（アンバー系） */
+.incomplete-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #8a5300;
+  background: #fff3cd;
+  border: 1px solid #ffd666;
+  border-radius: 999px;
+  white-space: nowrap;
+}

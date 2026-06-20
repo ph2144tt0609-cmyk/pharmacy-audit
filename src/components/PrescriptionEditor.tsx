@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, lookupDrugName, rememberDrug, type Item, type Prescription } from '../db';
 import { parseGS1 } from '../gs1';
@@ -7,6 +7,7 @@ import { shrinkImage, uuid } from '../utils';
 import { expiryStatus } from '../expiry';
 import { lookupGtinMaster } from '../gtinMaster';
 import { CameraScanner } from './CameraScanner';
+import { saveDraft, loadDraft, clearDraft, isDraftMeaningful, type Draft, type DraftItem } from '../draft';
 import './editor-extra.css';
 
 interface Props {
@@ -28,12 +29,87 @@ function isValidGrams(s: string): boolean {
   return Number.isFinite(n) && n > 0;
 }
 
+// Item からテキスト項目だけを取り出して下書き用 DraftItem に変換する（写真 Blob は除外）。
+function toDraftItem(it: Item): DraftItem {
+  return {
+    id: it.id,
+    drugName: it.drugName,
+    gtin: it.gtin,
+    lot: it.lot,
+    expiry: it.expiry,
+    serial: it.serial,
+    grams: it.grams,
+    gs1Raw: it.gs1Raw,
+  };
+}
+
+// 下書きの savedAt（ISO文字列）を画面表示用の時刻に整形する。失敗時は空文字。
+function formatSavedAt(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleString('ja-JP', {
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export function PrescriptionEditor({ initial, onSaved, onCancel }: Props) {
   const dispensers = useLiveQuery(() => db.dispensers.orderBy('name').toArray());
   const [number, setNumber] = useState(initial?.number ?? '');
   const [operator, setOperator] = useState(initial?.operator ?? localStorage.getItem('operator') ?? '');
   const [items, setItems] = useState<Item[]>(initial?.items ?? [emptyItem()]);
   const [saving, setSaving] = useState(false);
+
+  // 新規作成（initial なし）のときだけ下書き機能を有効化する
+  const isNew = initial === undefined;
+  // マウント時に意味のある下書きがあれば復元バナーを出す
+  const [draftPrompt, setDraftPrompt] = useState<Draft | null>(null);
+
+  // マウント時：新規作成かつ意味のある下書きがあれば復元を提示する
+  useEffect(() => {
+    if (!isNew) return;
+    const d = loadDraft();
+    if (d && isDraftMeaningful(d)) setDraftPrompt(d);
+    // マウント時のみ実行（初期判定なので依存は空でよい）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 自動保存：number/operator/items の変更をデバウンス(約600ms)して下書き保存する。
+  // 新規作成時のみ・意味のある下書きのときだけ保存（空の下書きは作らない）。
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!isNew) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      const draft: Draft = {
+        number,
+        operator,
+        items: items.map(toDraftItem),
+        savedAt: new Date().toISOString(),
+      };
+      if (isDraftMeaningful(draft)) saveDraft(draft);
+    }, 600);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [isNew, number, operator, items]);
+
+  function restoreDraft() {
+    const d = draftPrompt;
+    if (!d) return;
+    setNumber(d.number);
+    setOperator(d.operator);
+    // 下書きの items をそのまま採用（写真 weighPhoto は復元対象外なので undefined のまま）
+    setItems(d.items.map((it) => ({ ...it })));
+    setDraftPrompt(null);
+  }
+
+  function discardDraft() {
+    clearDraft();
+    setDraftPrompt(null);
+  }
 
   // 選択中の調剤者がマスタに無い場合でも選択肢に出す
   const names = dispensers?.map((d) => d.name) ?? [];
@@ -75,6 +151,8 @@ export function PrescriptionEditor({ initial, onSaved, onCancel }: Props) {
       const id = initial?.id
         ? (await db.prescriptions.put(record), initial.id)
         : ((await db.prescriptions.add(record)) as number);
+      // 保存成功時は下書きを破棄（新規・編集どちらでも残骸を残さない）
+      clearDraft();
       onSaved(id);
     } finally {
       setSaving(false);
@@ -84,6 +162,20 @@ export function PrescriptionEditor({ initial, onSaved, onCancel }: Props) {
   return (
     <div className="editor">
       <h2>{initial ? '処方箋を編集' : '新しい処方箋'}</h2>
+
+      {draftPrompt && (
+        <div className="draft-banner" role="status">
+          <span className="draft-banner-text">
+            前回の入力途中があります
+            {formatSavedAt(draftPrompt.savedAt) && `（${formatSavedAt(draftPrompt.savedAt)}）`}
+            。写真は復元されません。
+          </span>
+          <span className="draft-banner-actions">
+            <button type="button" onClick={restoreDraft}>復元</button>
+            <button type="button" className="ghost" onClick={discardDraft}>破棄</button>
+          </span>
+        </div>
+      )}
 
       <div className="row">
         <label>

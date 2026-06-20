@@ -80,3 +80,48 @@
   font-size: 0.75rem;
   color: #c0392b;
 }
+
+/* 下書き復元バナー（新規作成時のみ・PrescriptionEditor で使用） */
+.draft-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin: 0.5rem 0 0.75rem;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.85rem;
+  color: #92400e;
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-radius: 8px;
+}
+
+.draft-banner-text {
+  flex: 1 1 12rem;
+  line-height: 1.4;
+}
+
+.draft-banner-actions {
+  display: flex;
+  flex: none;
+  gap: 0.4rem;
+}
+
+.draft-banner button {
+  flex: none;
+  padding: 0.35rem 0.8rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #fff;
+  background: #b45309;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.draft-banner button.ghost {
+  color: #92400e;
+  background: transparent;
+  border: 1px solid #d6a560;
+}

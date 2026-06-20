@@ -1,12 +1,23 @@
 import { useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../db';
+import { db, type Item } from '../db';
 import { formatDateTime } from '../utils';
 import './list-extra.css';
 
 interface Props {
   onNew: () => void;
   onOpen: (id: number) => void;
+}
+
+// 未完了アイテムの件数を数える。
+// アイテムは「秤量写真が無い」か「薬品の特定情報（gtin・drugName）が両方とも空」の
+// いずれかに該当する場合に未完了とみなす。
+function countIncomplete(items: Item[]): number {
+  return items.reduce((n, item) => {
+    const noPhoto = !item.weighPhoto;
+    const noDrug = !item.gtin?.trim() && !item.drugName?.trim();
+    return n + (noPhoto || noDrug ? 1 : 0);
+  }, 0);
 }
 
 export function PrescriptionList({ onNew, onOpen }: Props) {
@@ -103,11 +114,16 @@ export function PrescriptionList({ onNew, onOpen }: Props) {
       )}
 
       <ul>
-        {filtered?.map((p) => (
+        {filtered?.map((p) => {
+          const incomplete = countIncomplete(p.items);
+          return (
           <li key={p.id} onClick={() => onOpen(p.id!)}>
             <div className="meta">
               <span className="num">#{p.number}</span>
               <span className="date">{formatDateTime(p.createdAt)}</span>
+              {incomplete > 0 && (
+                <span className="incomplete-badge">未完了 {incomplete}件</span>
+              )}
             </div>
             <div className="sub">
               <span>調剤者: {p.operator}</span>
@@ -131,7 +147,8 @@ export function PrescriptionList({ onNew, onOpen }: Props) {
               </button>
             </div>
           </li>
-        ))}
+          );
+        })}
       </ul>
     </div>
   );
